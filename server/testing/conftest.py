@@ -1,9 +1,18 @@
-#!/usr/bin/env python3
+# conftest.py (or inside your test file)
+import pytest
+from app import create_app
+from models import db
 
-def pytest_itemcollected(item):
-    par = item.parent.obj
-    node = item.obj
-    pref = par.__doc__.strip() if par.__doc__ else par.__class__.__name__
-    suf = node.__doc__.strip() if node.__doc__ else node.__name__
-    if pref or suf:
-        item._nodeid = ' '.join((pref, suf))
+@pytest.fixture(scope='module')
+def test_client():
+    test_config = {
+        "SQLALCHEMY_DATABASE_URI": "sqlite:///:memory:",
+        "TESTING": True
+    }
+    flask_app = create_app(test_config)
+
+    with flask_app.app_context():
+        db.create_all()
+        yield flask_app.test_client()
+        db.session.remove()
+        db.drop_all()

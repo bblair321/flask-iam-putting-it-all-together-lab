@@ -1,33 +1,53 @@
-#!/usr/bin/env python3
+# app.py
+from flask import Flask, request, jsonify, session
+from flask_migrate import Migrate
+from flask_cors import CORS
 
-from flask import request, session
-from flask_restful import Resource
-from sqlalchemy.exc import IntegrityError
+from models import db, User, Recipe
 
-from config import app, db, api
-from models import User, Recipe, UserSchema, RecipeSchema
+def create_app(test_config=None):
+    app = Flask(__name__)
+    app.secret_key = 'supersecretkey'
+    CORS(app)
 
-class Signup(Resource):
-    pass
+    app.config['SQLALCHEMY_DATABASE_URI'] = (
+        test_config.get('SQLALCHEMY_DATABASE_URI') if test_config else 'sqlite:///app.db'
+    )
+    app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+    app.config['TESTING'] = test_config.get('TESTING', False) if test_config else False
 
-class CheckSession(Resource):
-    pass
+    db.init_app(app)
+    Migrate(app, db)
 
-class Login(Resource):
-    pass
+    @app.route('/signup', methods=['POST'])
+    def signup():
+        data = request.get_json()
+        if not data.get('username') or not data.get('password'):
+            return jsonify({"error": "Username and password required"}), 400
 
-class Logout(Resource):
-    pass
+        existing_user = User.query.filter_by(username=data['username']).first()
+        if existing_user:
+            return jsonify({"error": "Username already taken"}), 409
 
-class RecipeIndex(Resource):
-    pass
+        new_user = User(
+            username=data['username'],
+            password=data['password'],
+            image_url=data.get('image_url'),
+            bio=data.get('bio')
+        )
+        db.session.add(new_user)
+        db.session.commit()
+        return jsonify({"message": "User created successfully"}), 201
 
-api.add_resource(Signup, '/signup', endpoint='signup')
-api.add_resource(CheckSession, '/check_session', endpoint='check_session')
-api.add_resource(Login, '/login', endpoint='login')
-api.add_resource(Logout, '/logout', endpoint='logout')
-api.add_resource(RecipeIndex, '/recipes', endpoint='recipes')
+    @app.route('/login', methods=['POST'])
+    def login():
+        data = request.get_json()
+        user = User.query.filter_by(username=data.get('username'), password=data.get('password')).first()
+        if user:
+            session['user_id'] = user.id
+            return jsonify({"message": "Login successful"}), 200
+        return jsonify({"error": "Invalid credentials"}), 401
 
+    return app
 
-if __name__ == '__main__':
-    app.run(port=5555, debug=True)
+app = create_app()

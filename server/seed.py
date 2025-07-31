@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 
 from random import randint, choice as rc
-
 from faker import Faker
 
 from app import app
@@ -11,11 +10,12 @@ fake = Faker()
 
 with app.app_context():
 
+    # Create tables if they don't exist yet
+    db.create_all()
+
     print("Deleting all records...")
     Recipe.query.delete()
     User.query.delete()
-
-    fake = Faker()
 
     print("Creating users...")
 
